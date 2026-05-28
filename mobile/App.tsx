@@ -1,0 +1,30 @@
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import HomeScreen from './screens/HomeScreen';
+import PreviewScreen from './screens/PreviewScreen';
+import ResultScreen from './screens/ResultScreen';
+
+export type Track = { song: string; artist: string };
+
+export type RootStackParamList = {
+  Home: undefined;
+  Preview: { tracks: Track[]; playlistName: string };
+  Result: { addedCount: number; skipped: string[]; playlistUrl: string };
+};
+
+const Stack = createNativeStackNavigator<RootStackParamList>();
+
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Stack.Navigator
+        initialRouteName="Home"
+        screenOptions={{ headerStyle: { backgroundColor: '#1DB954' }, headerTintColor: '#fff' }}
+      >
+        <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Playlist Generator' }} />
+        <Stack.Screen name="Preview" component={PreviewScreen} options={{ title: 'Preview Songs' }} />
+        <Stack.Screen name="Result" component={ResultScreen} options={{ title: 'Done!' }} />
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
+}

@@ -1,111 +1,58 @@
-import openai
-import spotipy
-from dotenv import dotenv_values
-
 import argparse
-import datetime
-import json
-import os
+from playlist_generator import get_playlist, add_songs_to_spotify
 
 
-config = dotenv_values(".env")
-openai.api_key = config["OPENAI_API_KEY"]
+def main():
+    parser = argparse.ArgumentParser(description="Generate a Spotify playlist from a text prompt")
+    parser.add_argument("-p", type=str, default="My Generated Playlist",
+                        help="Describe the playlist (e.g. 'upbeat 90s workout songs')")
+    parser.add_argument("-n", type=int, default=8,
+                        help="Number of songs (1–50)")
+    parser.add_argument("-g", type=str, default="",
+                        help="Genre filter (e.g. 'jazz', 'hip-hop')")
+    parser.add_argument("-d", type=str, default="",
+                        help="Decade filter (e.g. '90s', '2000s')")
+    parser.add_argument("-m", type=str, default="",
+                        help="Mood filter (e.g. 'upbeat', 'melancholic')")
+    parser.add_argument("--yes", action="store_true",
+                        help="Skip confirmation and add songs immediately")
+    args = parser.parse_args()
 
-parser = argparse.ArgumentParser(description="Simple command line song utility")
-parser.add_argument("-p", type=str, default="My Generated Playlist", help="The prompt to describe the playlist")
-parser.add_argument("-n", type=int, default=8, help="The prompt to set the number of songs to add to the playlist")
+    if not 1 <= args.n <= 50:
+        raise ValueError("n must be between 1 and 50")
 
-args = parser.parse_args()
+    prompt_parts = [args.p]
+    if args.g:
+        prompt_parts.append(f"genre: {args.g}")
+    if args.d:
+        prompt_parts.append(f"decade: {args.d}")
+    if args.m:
+        prompt_parts.append(f"mood: {args.m}")
+    full_prompt = ", ".join(prompt_parts)
 
-if args.n not in range(1,50):
-    raise ValueError("Error: n should be between 0 and 50")
+    print(f"\nGenerating {args.n} songs for: \"{full_prompt}\"...\n")
+    playlist = get_playlist(full_prompt, args.n)
 
-playlist_prompt = args.p
-count = args.n
+    print("Songs to add:")
+    for i, item in enumerate(playlist, 1):
+        print(f"  {i:2}. {item['song']} — {item['artist']}")
 
-def get_playlist(prompt, count=8):
-    example_json = """
-    [
-    {"song": "The Sound of Silence", "artist": "Simon & Garfunkel"},
-    {"song": "Yesterday", "artist": "The Beatles"},
-    {"song": "Hurt", "artist": "Johnny Cash"},
-    {"song": "Mad World", "artist": "Gary Jules"},
-    {"song": "Creep", "artist": "Radiohead"},
-    {"song": "Fix You", "artist": "Coldplay"},
-    {"song": "Someone Like You", "artist": "Adele"},
-    {"song": "Say Something", "artist": "A Great Big World"},
-    {"song": "When You're Gone", "artist": "Avril Lavigne"},
-    {"song": "Teardrop", "artist": "Massive Attack"},
-    {"song": "Everybody Hurts", "artist": "R.E.M."},
-    {"song": "I Will Always Love You", "artist": "Whitney Houston"},
-    {"song": "Hello", "artist": "Adele"}
-    ]
-    """
+    if not args.yes:
+        confirm = input("\nAdd these to Spotify? [y/N] ").strip().lower()
+        if confirm != "y":
+            print("Cancelled.")
+            return
 
-    messages = [
-        {
-            "role": "system", 
-            "content": """You are a helpful playlist generating assistant.
-            You should generate a list of songs and their artists according to a text prompt.
-            You should return a JSON array where each element follows this format: {"song": <song_title>, "artist": <artist_name>}"""
-        },
-        {
-            "role": "user", 
-            "content": "Generate a playlist of 13 songs based on this prompt: super super sad songs"
-        },
-        {
-            "role": "assistant", 
-            "content": example_json
-        },
-        {
-            "role": "user", 
-            "content": f"Generate a playlist of {count} songs based on this prompt: {prompt}"
-        }
-    ]
-    
-    response = openai.ChatCompletion.create(
-        messages=messages,
-        model="gpt-4",
-        max_tokens=400
-    )
-    
-    playlist = json.loads(response["choices"][0]["message"]["content"])
-    return playlist
+    print("\nAdding to Spotify...")
+    added, skipped = add_songs_to_spotify(args.p, playlist)
 
-def add_songs_to_spotify(playlist_prompt, playlist):
-    sp = spotipy.Spotify(
-        auth_manager=spotipy.SpotifyOAuth(
-            client_id=config["SPOTIFY_CLIENT_ID"],
-            client_secret=config["SPOTIFY_CLIENT_SECRET"],
-            redirect_uri="http://localhost:9999",
-            scope="playlist-modify-private"
-        )
-    )
+    if skipped:
+        print(f"\nSkipped ({len(skipped)} not found on Spotify):")
+        for s in skipped:
+            print(f"  - {s}")
 
-    current_user = sp.current_user()
-
-    assert current_user is not None
-
-    track_ids = []
-
-    for item in playlist:
-        artist, song = item["artist"], item["song"]
-        query = f"{song} {artist}"
-        search_results = sp.search(q=query, type="track", limit=10)
-        track_ids.append(search_results["tracks"]["items"][0]["id"])
+    print(f"\nCreated playlist \"{args.p}\" with {added} songs.")
 
 
-    created_playlist = sp.user_playlist_create(
-        current_user["id"],
-        public=False,
-        name=f"{playlist_prompt}" 
-    )
-
-    sp.user_playlist_add_tracks(current_user["id"], created_playlist["id"], track_ids)
-
-playlist = get_playlist(playlist_prompt, count)
-add_songs_to_spotify(playlist_prompt, playlist)
-
-print("\n")
-print(f"Created playlist: {playlist_prompt}")
-    
+if __name__ == "__main__":
+    main()

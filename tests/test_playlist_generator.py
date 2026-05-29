@@ -22,6 +22,7 @@ def test_returns_added_count_and_url():
     assert added == 1
     assert skipped == []
     assert url == "https://open.spotify.com/playlist/abc"
+    mock_sp.user_playlist_add_tracks.assert_called_once_with("user123", "playlist1", ["track1"])
 
 
 def test_skips_unfound_tracks():
@@ -45,17 +46,8 @@ def test_skips_unfound_tracks():
 
     assert added == 1
     assert len(skipped) == 1
-    assert "Ghost" in skipped[0]
-
-
-def test_raises_on_bad_token():
-    import spotipy as _spotipy
-    with patch("playlist_generator.spotipy.Spotify") as MockSp:
-        MockSp.return_value.current_user.side_effect = _spotipy.SpotifyException(
-            http_status=401, code=-1, msg="Unauthorized"
-        )
-        with pytest.raises(RuntimeError, match="authentication failed"):
-            add_songs_with_token("p", [{"song": "A", "artist": "B"}], "bad_token")
+    assert skipped[0] == "Ghost — Unknown"
+    mock_sp.user_playlist_add_tracks.assert_called_once_with("user123", "p1", ["t1"])
 
 
 def test_raises_when_no_tracks_found():

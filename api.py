@@ -1,14 +1,21 @@
 import logging
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from playlist_generator import get_playlist, add_songs_with_token
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 import spotipy
 
 logger = logging.getLogger(__name__)
 
+limiter = Limiter(key_func=get_remote_address)
+
 app = FastAPI(title="Spotify Playlist Generator API")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,7 +55,8 @@ class AddToSpotifyResponse(BaseModel):
 
 
 @app.post("/generate", response_model=GenerateResponse)
-def generate(req: GenerateRequest):
+@limiter.limit("10/hour")
+def generate(request: Request, req: GenerateRequest):
     prompt_parts = [req.prompt]
     if req.genre:
         prompt_parts.append(f"genre: {req.genre}")
@@ -68,7 +76,8 @@ def generate(req: GenerateRequest):
 
 
 @app.post("/add-to-spotify", response_model=AddToSpotifyResponse)
-def add_to_spotify(req: AddToSpotifyRequest):
+@limiter.limit("10/hour")
+def add_to_spotify(request: Request, req: AddToSpotifyRequest):
     try:
         added, skipped, url = add_songs_with_token(
             req.playlist_name,

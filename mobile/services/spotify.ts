@@ -16,7 +16,10 @@ function requireClientId(): string {
   return CLIENT_ID;
 }
 
-const REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: 'spotifyplaylist' });
+const REDIRECT_URI = AuthSession.makeRedirectUri({
+  scheme: 'spotifyplaylist',
+  native: 'spotifyplaylist://callback',
+});
 const TOKEN_ENDPOINT = 'https://accounts.spotify.com/api/token';
 const AUTH_ENDPOINT = 'https://accounts.spotify.com/authorize';
 const SCOPES = 'playlist-modify-private user-read-private';

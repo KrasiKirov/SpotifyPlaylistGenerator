@@ -32,7 +32,13 @@ export default function App() {
     <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         initialRouteName="Home"
-        screenOptions={{ headerStyle: { backgroundColor: '#1DB954' }, headerTintColor: '#fff' }}
+        screenOptions={{
+          headerStyle: { backgroundColor: '#0C0C0C' },
+          headerTintColor: '#F0EDE8',
+          headerShadowVisible: false,
+          headerTitleStyle: { fontWeight: '700', letterSpacing: -0.3, fontSize: 16 },
+          contentStyle: { backgroundColor: '#0C0C0C' },
+        }}
       >
         <Stack.Screen name="Home" component={HomeScreen} options={{ title: 'Playlist Generator' }} />
         <Stack.Screen name="Preview" component={PreviewScreen} options={{ title: 'Preview Songs' }} />

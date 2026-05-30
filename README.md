@@ -6,7 +6,7 @@
 
 ## Try it now
 
-**Android** — [Download the latest APK](https://github.com/KrasiKirov/SpotifyPlaylistGenerator/releases/latest), open it on your phone, allow "install from unknown sources", and open the app. The backend is hosted and ready — no setup required.
+**Android** — [Download the latest APK](https://github.com/KrasiKirov/SpotifyPlaylistGenerator/releases/latest), open it on your phone, and open the app. The backend is hosted and ready — no setup required.
 
 **iOS** — not yet built. The API is open at [`/docs`](https://spotifyplaylistgenerator-production.up.railway.app/docs) if you'd like to hit it directly.
 

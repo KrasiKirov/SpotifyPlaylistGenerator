@@ -36,7 +36,7 @@ def get_playlist(prompt: str, count: int = 8) -> list[dict]:
     ]
 
     response = client.chat.completions.create(
-        model="gpt-4o",
+        model="gpt-4.1-mini",
         messages=messages,
         max_tokens=max(400, count * 30),
     )

@@ -1,9 +1,10 @@
 import json
 import openai
 import spotipy
+import os
 from dotenv import dotenv_values
 
-config = dotenv_values(".env")
+config = {**dotenv_values(".env"), **os.environ}
 
 
 def get_playlist(prompt: str, count: int = 8) -> list[dict]:

@@ -1,15 +1,23 @@
 import { useState } from 'react';
 import {
   View, Text, TextInput, FlatList, StyleSheet,
-  TouchableOpacity, ActivityIndicator, Alert, StatusBar,
+  Pressable, ActivityIndicator, Alert, StatusBar,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../App';
 import { addToSpotify } from '../services/api';
 import { getAccessToken, disconnect } from '../services/spotify';
-import { colors, shadow } from '../theme';
+import { colors, fonts, spacing, hairline, shadow, radii } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Preview'>;
+
+const ROMAN = [
+  'I.', 'II.', 'III.', 'IV.', 'V.', 'VI.', 'VII.', 'VIII.', 'IX.', 'X.',
+  'XI.', 'XII.', 'XIII.', 'XIV.', 'XV.', 'XVI.', 'XVII.', 'XVIII.', 'XIX.', 'XX.',
+  'XXI.', 'XXII.', 'XXIII.', 'XXIV.', 'XXV.', 'XXVI.', 'XXVII.', 'XXVIII.', 'XXIX.', 'XXX.',
+  'XXXI.', 'XXXII.', 'XXXIII.', 'XXXIV.', 'XXXV.', 'XXXVI.', 'XXXVII.', 'XXXVIII.', 'XXXIX.', 'XL.',
+  'XLI.', 'XLII.', 'XLIII.', 'XLIV.', 'XLV.', 'XLVI.', 'XLVII.', 'XLVIII.', 'XLIX.', 'L.',
+];
 
 export default function PreviewScreen({ route, navigation }: Props) {
   const { tracks, playlistName } = route.params;
@@ -23,7 +31,7 @@ export default function PreviewScreen({ route, navigation }: Props) {
 
   async function handleAdd() {
     if (currentTracks.length === 0) {
-      Alert.alert('', 'Add at least one song before saving.');
+      Alert.alert('A moment', 'A side must hold at least one track.');
       return;
     }
     setLoading(true);
@@ -42,11 +50,11 @@ export default function PreviewScreen({ route, navigation }: Props) {
     } catch (e: any) {
       if (e.message.includes('expired') || e.message.includes('reconnect')) {
         await disconnect();
-        Alert.alert('Session expired', 'Please reconnect Spotify.', [
-          { text: 'OK', onPress: () => navigation.popToTop() },
+        Alert.alert('Session lapsed', 'Pair with Spotify again to continue.', [
+          { text: 'Very well', onPress: () => navigation.popToTop() },
         ]);
       } else {
-        Alert.alert('Error', e.message);
+        Alert.alert('Couldn’t save', e.message);
       }
     } finally {
       setLoading(false);
@@ -58,16 +66,19 @@ export default function PreviewScreen({ route, navigation }: Props) {
       <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
 
       <View style={styles.header}>
-        <Text style={styles.nameLabel}>PLAYLIST NAME</Text>
+        <View style={styles.headerRow}>
+          <Text style={styles.eyebrow}>side a · {String(currentTracks.length).padStart(2, '0')} tracks</Text>
+          <Text style={styles.duration}>~{String(currentTracks.length * 3).padStart(2, '0')} min</Text>
+        </View>
         <TextInput
           style={styles.nameInput}
           value={name}
           onChangeText={setName}
-          placeholder="My Playlist"
+          placeholder="Untitled folio"
           placeholderTextColor={colors.dim}
           returnKeyType="done"
         />
-        <Text style={styles.trackCount}>{currentTracks.length} tracks</Text>
+        <Text style={styles.namePencil}>— a working title, edit at will</Text>
       </View>
 
       <FlatList
@@ -75,34 +86,58 @@ export default function PreviewScreen({ route, navigation }: Props) {
         keyExtractor={(item, i) => `${i}__${item.song}__${item.artist}`}
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListFooterComponent={() => (
+          <View style={styles.listFooter}>
+            <View style={styles.ruleShort} />
+            <Text style={styles.endmark}>fin.</Text>
+            <View style={styles.ruleShort} />
+          </View>
+        )}
         renderItem={({ item, index }) => (
           <View style={styles.track}>
-            <Text style={styles.number}>{String(index + 1).padStart(2, '0')}</Text>
+            <Text style={styles.roman}>{ROMAN[index] ?? `${index + 1}.`}</Text>
             <View style={styles.trackInfo}>
               <Text style={styles.song} numberOfLines={1}>{item.song}</Text>
-              <Text style={styles.artist} numberOfLines={1}>{item.artist}</Text>
+              <Text style={styles.artist} numberOfLines={1}>
+                <Text style={styles.artistDash}>by </Text>{item.artist}
+              </Text>
             </View>
-            <TouchableOpacity onPress={() => removeTrack(index)} hitSlop={12} style={styles.removeBtn}>
-              <Text style={styles.removeText}>✕</Text>
-            </TouchableOpacity>
+            <Pressable
+              onPress={() => removeTrack(index)}
+              hitSlop={14}
+              style={({ pressed }) => [styles.removeBtn, pressed && { opacity: 0.4 }]}
+            >
+              <Text style={styles.removeText}>strike</Text>
+            </Pressable>
           </View>
         )}
       />
 
       <View style={styles.footer}>
-        <TouchableOpacity style={styles.secondary} onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Text style={styles.secondaryText}>Regenerate</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.addBtn, loading && styles.disabled, shadow.green]}
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={({ pressed }) => [styles.secondary, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={styles.secondaryText}>← reconsider</Text>
+        </Pressable>
+        <Pressable
           onPress={handleAdd}
           disabled={loading}
-          activeOpacity={0.85}
+          style={({ pressed }) => [
+            styles.addBtn, shadow.brass,
+            pressed && { opacity: 0.85, transform: [{ scale: 0.995 }] },
+            loading && { opacity: 0.45 },
+          ]}
         >
-          {loading
-            ? <ActivityIndicator color={colors.bg} size="small" />
-            : <Text style={styles.addBtnText}>Add to Spotify</Text>}
-        </TouchableOpacity>
+          {loading ? (
+            <ActivityIndicator color={colors.bgDeep} size="small" />
+          ) : (
+            <>
+              <Text style={styles.addBtnText}>Press to Spotify</Text>
+              <Text style={styles.addBtnArrow}>↗</Text>
+            </>
+          )}
+        </Pressable>
       </View>
     </View>
   );
@@ -112,53 +147,89 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
 
   header: {
-    paddingHorizontal: 24, paddingTop: 20, paddingBottom: 16,
-    borderBottomWidth: 1, borderBottomColor: colors.border,
+    paddingHorizontal: spacing.l, paddingTop: spacing.l, paddingBottom: spacing.m,
+    borderBottomWidth: hairline, borderBottomColor: colors.hairlineSoft,
+    gap: 8,
   },
-  nameLabel: {
-    fontSize: 10, fontWeight: '700', color: colors.muted,
-    letterSpacing: 2, marginBottom: 6,
+  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline' },
+  eyebrow: {
+    fontFamily: fonts.mono, fontSize: 10, color: colors.brass,
+    letterSpacing: 3, textTransform: 'uppercase',
+  },
+  duration: {
+    fontFamily: fonts.mono, fontSize: 10, color: colors.muted,
+    letterSpacing: 2, textTransform: 'lowercase',
   },
   nameInput: {
-    fontSize: 22, fontWeight: '700', color: colors.white,
-    letterSpacing: -0.5, padding: 0,
+    fontFamily: fonts.serifBold, fontSize: 30, color: colors.ink,
+    letterSpacing: -1, padding: 0, marginTop: 2,
   },
-  trackCount: {
-    fontSize: 12, color: colors.muted, marginTop: 6,
-    fontFamily: 'Courier New',
+  namePencil: {
+    fontFamily: fonts.serifItalic, fontSize: 12, color: colors.muted,
   },
 
-  list: { paddingVertical: 8 },
-  separator: { height: 1, backgroundColor: colors.border, marginLeft: 72 },
+  list: { paddingTop: spacing.s, paddingBottom: spacing.l },
+  separator: { height: hairline, backgroundColor: colors.hairlineSoft, marginLeft: 64 },
+
   track: {
     flexDirection: 'row', alignItems: 'center',
-    paddingVertical: 14, paddingHorizontal: 24, gap: 16,
+    paddingVertical: 16, paddingHorizontal: spacing.l, gap: 14,
   },
-  number: {
-    fontSize: 13, color: colors.muted, width: 28,
-    fontFamily: 'Courier New', letterSpacing: 0.5,
+  roman: {
+    fontFamily: fonts.serifItalic, fontSize: 15, color: colors.brass,
+    width: 42, letterSpacing: 0.4,
   },
-  trackInfo: { flex: 1 },
-  song: { fontSize: 15, fontWeight: '600', color: colors.white, letterSpacing: -0.2 },
-  artist: { fontSize: 13, color: colors.muted, marginTop: 2 },
-  removeBtn: { padding: 4 },
-  removeText: { fontSize: 14, color: colors.border },
+  trackInfo: { flex: 1, gap: 3 },
+  song: {
+    fontFamily: fonts.serifMedium, fontSize: 17, color: colors.ink,
+    letterSpacing: -0.3,
+  },
+  artist: {
+    fontFamily: fonts.serif, fontSize: 13, color: colors.inkMid,
+  },
+  artistDash: { fontFamily: fonts.serifItalic, color: colors.muted },
+  removeBtn: { paddingVertical: 4, paddingHorizontal: 2 },
+  removeText: {
+    fontFamily: fonts.serifItalic, fontSize: 12, color: colors.muted,
+    textDecorationLine: 'underline', textDecorationColor: colors.brassDeep,
+  },
+
+  listFooter: {
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    paddingVertical: spacing.l, paddingHorizontal: spacing.xl,
+  },
+  ruleShort: { flex: 1, height: hairline, backgroundColor: colors.hairline },
+  endmark: {
+    fontFamily: fonts.serifItalic, fontSize: 13, color: colors.brass,
+    letterSpacing: 1,
+  },
 
   footer: {
-    flexDirection: 'row', padding: 16, gap: 10,
-    borderTopWidth: 1, borderTopColor: colors.border,
+    flexDirection: 'row', alignItems: 'stretch',
+    paddingHorizontal: spacing.l, paddingTop: spacing.m, paddingBottom: spacing.l,
+    gap: spacing.s,
+    borderTopWidth: hairline, borderTopColor: colors.hairlineSoft,
     backgroundColor: colors.bg,
   },
-  addBtn: {
-    flex: 2, backgroundColor: colors.green,
-    paddingVertical: 16, borderRadius: 50, alignItems: 'center',
-  },
-  addBtnText: { color: colors.bg, fontSize: 15, fontWeight: '800', letterSpacing: 0.3 },
   secondary: {
-    flex: 1, backgroundColor: colors.surface,
-    paddingVertical: 16, borderRadius: 50, alignItems: 'center',
-    borderWidth: 1, borderColor: colors.border,
+    paddingVertical: 18, paddingHorizontal: spacing.m,
+    justifyContent: 'center', alignItems: 'center',
+    borderWidth: hairline, borderColor: colors.hairline,
+    borderRadius: radii.sharp,
   },
-  secondaryText: { fontSize: 14, fontWeight: '600', color: colors.muted },
-  disabled: { opacity: 0.4 },
+  secondaryText: {
+    fontFamily: fonts.serifItalic, fontSize: 14, color: colors.inkMid,
+  },
+  addBtn: {
+    flex: 1, flexDirection: 'row',
+    justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: colors.brass,
+    paddingVertical: 18, paddingHorizontal: spacing.l,
+    borderRadius: radii.sharp,
+  },
+  addBtnText: {
+    fontFamily: fonts.serifBold, fontSize: 16, color: colors.bgDeep,
+    letterSpacing: -0.3,
+  },
+  addBtnArrow: { fontFamily: fonts.serif, fontSize: 18, color: colors.bgDeep },
 });

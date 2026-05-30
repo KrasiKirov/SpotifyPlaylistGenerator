@@ -1,4 +1,6 @@
-import { NavigationContainer } from '@react-navigation/native';
+import { useEffect } from 'react';
+import { AppState } from 'react-native';
+import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from './screens/HomeScreen';
 import PreviewScreen from './screens/PreviewScreen';
@@ -15,8 +17,19 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
 export default function App() {
+  const navigationRef = useNavigationContainerRef();
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextState) => {
+      if (nextState === 'active' && navigationRef.isReady()) {
+        navigationRef.reset({ index: 0, routes: [{ name: 'Home' }] });
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <Stack.Navigator
         initialRouteName="Home"
         screenOptions={{ headerStyle: { backgroundColor: '#1DB954' }, headerTintColor: '#fff' }}

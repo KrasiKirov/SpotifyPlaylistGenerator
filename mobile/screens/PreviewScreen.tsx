@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import {
-  View, Text, FlatList, StyleSheet,
+  View, Text, TextInput, FlatList, StyleSheet,
   TouchableOpacity, ActivityIndicator, Alert,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -12,15 +12,25 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Preview'>;
 
 export default function PreviewScreen({ route, navigation }: Props) {
   const { tracks, playlistName } = route.params;
+  const [name, setName] = useState(playlistName);
+  const [currentTracks, setCurrentTracks] = useState(tracks);
   const [loading, setLoading] = useState(false);
 
+  function removeTrack(index: number) {
+    setCurrentTracks(t => t.filter((_, i) => i !== index));
+  }
+
   async function handleAdd() {
+    if (currentTracks.length === 0) {
+      Alert.alert('No songs', 'Add at least one song before saving.');
+      return;
+    }
     setLoading(true);
     try {
       const token = await getAccessToken();
       const result = await addToSpotify({
-        playlist_name: playlistName,
-        tracks,
+        playlist_name: name.trim() || playlistName,
+        tracks: currentTracks,
         spotify_token: token,
       });
       navigation.replace('Result', {
@@ -44,8 +54,18 @@ export default function PreviewScreen({ route, navigation }: Props) {
 
   return (
     <View style={styles.container}>
+      <View style={styles.nameRow}>
+        <Text style={styles.nameLabel}>Playlist name</Text>
+        <TextInput
+          style={styles.nameInput}
+          value={name}
+          onChangeText={setName}
+          placeholder="Playlist name"
+          returnKeyType="done"
+        />
+      </View>
       <FlatList
-        data={tracks}
+        data={currentTracks}
         keyExtractor={(_, i) => String(i)}
         contentContainerStyle={styles.list}
         renderItem={({ item, index }) => (
@@ -55,6 +75,9 @@ export default function PreviewScreen({ route, navigation }: Props) {
               <Text style={styles.song}>{item.song}</Text>
               <Text style={styles.artist}>{item.artist}</Text>
             </View>
+            <TouchableOpacity onPress={() => removeTrack(index)} hitSlop={8}>
+              <Text style={styles.remove}>✕</Text>
+            </TouchableOpacity>
           </View>
         )}
       />
@@ -84,9 +107,13 @@ const styles = StyleSheet.create({
     gap: 12, borderBottomWidth: 1, borderBottomColor: '#eee',
   },
   number: { fontSize: 14, color: '#aaa', width: 28, textAlign: 'right' },
+  remove: { fontSize: 16, color: '#ccc', paddingHorizontal: 4 },
   trackInfo: { flex: 1 },
   song: { fontSize: 16, fontWeight: '500', color: '#111' },
   artist: { fontSize: 14, color: '#666', marginTop: 2 },
+  nameRow: { padding: 16, paddingBottom: 8, borderBottomWidth: 1, borderBottomColor: '#eee', backgroundColor: '#fff' },
+  nameLabel: { fontSize: 12, color: '#999', marginBottom: 4 },
+  nameInput: { fontSize: 16, fontWeight: '500', color: '#111', padding: 0 },
   footer: { flexDirection: 'row', padding: 16, gap: 10, borderTopWidth: 1, borderTopColor: '#eee' },
   button: {
     flex: 1, backgroundColor: '#1DB954',

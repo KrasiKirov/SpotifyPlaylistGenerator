@@ -72,7 +72,7 @@ export default function PreviewScreen({ route, navigation }: Props) {
 
       <FlatList
         data={currentTracks}
-        keyExtractor={(_, i) => String(i)}
+        keyExtractor={(item, i) => `${i}__${item.song}__${item.artist}`}
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
         renderItem={({ item, index }) => (

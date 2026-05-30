@@ -136,3 +136,38 @@ def test_add_to_spotify_invalid_token():
         })
 
     assert resp.status_code == 401
+
+
+def test_generate_rejects_oversized_prompt():
+    from api import app
+    client = TestClient(app)
+    resp = client.post("/generate", json={"prompt": "x" * 5000, "count": 5})
+    assert resp.status_code == 422
+
+
+def test_add_to_spotify_rejects_too_many_tracks():
+    from api import app
+    client = TestClient(app)
+    tracks = [{"song": f"s{i}", "artist": f"a{i}"} for i in range(51)]
+    resp = client.post("/add-to-spotify", json={
+        "playlist_name": "Test",
+        "tracks": tracks,
+        "spotify_token": "tok",
+    })
+    assert resp.status_code == 422
+
+
+def test_generate_returns_502_on_value_error():
+    from api import app
+    client = TestClient(app)
+    with patch("api.get_playlist", side_effect=ValueError("malformed")):
+        resp = client.post("/generate", json={"prompt": "sad songs"})
+    assert resp.status_code == 502
+
+
+def test_oversized_body_rejected():
+    from api import app
+    client = TestClient(app)
+    huge = {"prompt": "x" * 100, "padding": "y" * 200_000}
+    resp = client.post("/generate", json=huge)
+    assert resp.status_code == 413

@@ -1,6 +1,28 @@
 import { Track } from '../App';
 
-const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL!;
+const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
+if (!BACKEND_URL) {
+  throw new Error(
+    'EXPO_PUBLIC_BACKEND_URL is not set. Add it to mobile/.env before building.'
+  );
+}
+
+const REQUEST_TIMEOUT_MS = 30_000;
+
+async function timedFetch(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (e: any) {
+    if (e?.name === 'AbortError') {
+      throw new Error('Request timed out. Check your connection and try again.');
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export async function generatePlaylist(params: {
   prompt: string;
@@ -9,7 +31,7 @@ export async function generatePlaylist(params: {
   decade?: string;
   mood?: string;
 }): Promise<Track[]> {
-  const response = await fetch(`${BACKEND_URL}/generate`, {
+  const response = await timedFetch(`${BACKEND_URL}/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
@@ -27,7 +49,7 @@ export async function addToSpotify(params: {
   tracks: Track[];
   spotify_token: string;
 }): Promise<{ added_count: number; skipped: string[]; playlist_url: string }> {
-  const response = await fetch(`${BACKEND_URL}/add-to-spotify`, {
+  const response = await timedFetch(`${BACKEND_URL}/add-to-spotify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),

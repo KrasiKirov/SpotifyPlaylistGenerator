@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView,
   TouchableOpacity, ActivityIndicator, Alert, StatusBar,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { RootStackParamList } from '../App';
 import { generatePlaylist } from '../services/api';
 import { connectSpotify, isConnected } from '../services/spotify';
@@ -21,9 +22,13 @@ export default function HomeScreen({ navigation }: Props) {
   const [count, setCount] = useState(8);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    isConnected().then(setConnected);
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      isConnected().then(v => { if (!cancelled) setConnected(v); });
+      return () => { cancelled = true; };
+    }, [])
+  );
 
   async function handleConnect() {
     try {

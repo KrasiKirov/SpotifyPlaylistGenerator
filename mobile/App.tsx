@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
-import { AppState } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { NavigationContainer, useNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from './screens/HomeScreen';
@@ -16,13 +16,24 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+const RESET_AFTER_BACKGROUND_MS = 5 * 60 * 1000;
+
 export default function App() {
   const navigationRef = useNavigationContainerRef();
+  const backgroundedAt = useRef<number | null>(null);
 
   useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState) => {
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      if (nextState === 'background' || nextState === 'inactive') {
+        backgroundedAt.current = Date.now();
+        return;
+      }
       if (nextState === 'active' && navigationRef.isReady()) {
-        navigationRef.reset({ index: 0, routes: [{ name: 'Home' }] });
+        const ts = backgroundedAt.current;
+        backgroundedAt.current = null;
+        if (ts !== null && Date.now() - ts >= RESET_AFTER_BACKGROUND_MS) {
+          navigationRef.reset({ index: 0, routes: [{ name: 'Home' }] });
+        }
       }
     });
     return () => subscription.remove();

@@ -38,7 +38,7 @@ export default function ResultScreen({ route, navigation }: Props) {
           {showSkipped && (
             <FlatList
               data={skipped}
-              keyExtractor={(_, i) => String(i)}
+              keyExtractor={(item, i) => `${i}__${item}`}
               style={styles.skippedList}
               renderItem={({ item }) => <Text style={styles.skippedItem}>— {item}</Text>}
             />

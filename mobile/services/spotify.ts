@@ -5,11 +5,18 @@ import * as Crypto from 'expo-crypto';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const CLIENT_ID = process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID!;
+const CLIENT_ID = process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID;
+if (!CLIENT_ID) {
+  throw new Error(
+    'EXPO_PUBLIC_SPOTIFY_CLIENT_ID is not set. Add it to mobile/.env before building.'
+  );
+}
+
 const REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: 'spotifyplaylist' });
 const TOKEN_ENDPOINT = 'https://accounts.spotify.com/api/token';
 const AUTH_ENDPOINT = 'https://accounts.spotify.com/authorize';
 const SCOPES = 'playlist-modify-private user-read-private';
+const TOKEN_REQUEST_TIMEOUT_MS = 15_000;
 
 const KEYS = {
   accessToken: 'spotify_access_token',
@@ -24,6 +31,16 @@ function base64URLEncode(bytes: Uint8Array): string {
     .replace(/=+$/, '');
 }
 
+async function timedFetch(url: string, init: RequestInit): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TOKEN_REQUEST_TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export async function connectSpotify(): Promise<void> {
   const randomBytes = await Crypto.getRandomBytesAsync(32);
   const codeVerifier = base64URLEncode(randomBytes);
@@ -35,20 +52,28 @@ export async function connectSpotify(): Promise<void> {
   );
   const codeChallenge = hash.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 
+  const stateBytes = await Crypto.getRandomBytesAsync(16);
+  const state = base64URLEncode(stateBytes);
+
   const authUrl =
     `${AUTH_ENDPOINT}?client_id=${CLIENT_ID}` +
     `&response_type=code` +
     `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
     `&scope=${encodeURIComponent(SCOPES)}` +
     `&code_challenge_method=S256` +
-    `&code_challenge=${codeChallenge}`;
+    `&code_challenge=${codeChallenge}` +
+    `&state=${state}`;
 
   const result = await WebBrowser.openAuthSessionAsync(authUrl, REDIRECT_URI);
   if (result.type !== 'success' || !result.url) {
     throw new Error('Spotify login was cancelled or failed.');
   }
-  // Parse the code from result.url
+
   const urlParams = new URL(result.url);
+  const returnedState = urlParams.searchParams.get('state');
+  if (returnedState !== state) {
+    throw new Error('Spotify login failed: state mismatch.');
+  }
   const code = urlParams.searchParams.get('code');
   if (!code) throw new Error('No authorization code returned from Spotify.');
 
@@ -60,7 +85,7 @@ export async function connectSpotify(): Promise<void> {
     code_verifier: codeVerifier,
   });
 
-  const tokenRes = await fetch(TOKEN_ENDPOINT, {
+  const tokenRes = await timedFetch(TOKEN_ENDPOINT, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
@@ -78,37 +103,49 @@ export async function connectSpotify(): Promise<void> {
   await SecureStore.setItemAsync(KEYS.expiresAt, String(expiresAt));
 }
 
+let pendingRefresh: Promise<string> | null = null;
+
 async function refreshAccessToken(): Promise<string> {
-  const refreshToken = await SecureStore.getItemAsync(KEYS.refreshToken);
-  if (!refreshToken) throw new Error('No refresh token — please reconnect Spotify.');
+  if (pendingRefresh) return pendingRefresh;
 
-  const body = new URLSearchParams({
-    grant_type: 'refresh_token',
-    refresh_token: refreshToken,
-    client_id: CLIENT_ID,
-  });
+  pendingRefresh = (async () => {
+    const refreshToken = await SecureStore.getItemAsync(KEYS.refreshToken);
+    if (!refreshToken) throw new Error('No refresh token — please reconnect Spotify.');
 
-  const res = await fetch(TOKEN_ENDPOINT, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: body.toString(),
-  });
+    const body = new URLSearchParams({
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+      client_id: CLIENT_ID,
+    });
 
-  if (!res.ok) {
-    await disconnect();
-    throw new Error('Spotify session expired. Please reconnect.');
+    const res = await timedFetch(TOKEN_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    });
+
+    if (!res.ok) {
+      await disconnect();
+      throw new Error('Spotify session expired. Please reconnect.');
+    }
+
+    const tokens = await res.json();
+    const expiresAt = Date.now() + tokens.expires_in * 1000;
+
+    await SecureStore.setItemAsync(KEYS.accessToken, tokens.access_token);
+    await SecureStore.setItemAsync(KEYS.expiresAt, String(expiresAt));
+    if (tokens.refresh_token) {
+      await SecureStore.setItemAsync(KEYS.refreshToken, tokens.refresh_token);
+    }
+
+    return tokens.access_token as string;
+  })();
+
+  try {
+    return await pendingRefresh;
+  } finally {
+    pendingRefresh = null;
   }
-
-  const tokens = await res.json();
-  const expiresAt = Date.now() + tokens.expires_in * 1000;
-
-  await SecureStore.setItemAsync(KEYS.accessToken, tokens.access_token);
-  await SecureStore.setItemAsync(KEYS.expiresAt, String(expiresAt));
-  if (tokens.refresh_token) {
-    await SecureStore.setItemAsync(KEYS.refreshToken, tokens.refresh_token);
-  }
-
-  return tokens.access_token;
 }
 
 export async function getAccessToken(): Promise<string> {

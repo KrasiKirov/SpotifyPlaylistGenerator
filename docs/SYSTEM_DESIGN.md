@@ -1,26 +1,19 @@
 # The Listening Room — System Design & Decision Record
 
-> An interview-prep playbook for the Spotify Playlist Generator. It documents what the
-> system is, **why each decision was made**, the industry standards behind those choices,
-> and how the design would evolve under load. Read it to explain the project with
-> confidence; skim the ADRs and the Q&A appendix the night before an interview.
-
-**Status:** living document · **Last updated:** 2026-05-30 · **Audience:** the author (interview prep) and future contributors.
-
 ---
 
 ## 1. Executive summary
 
-**The Listening Room** turns a natural-language mood ("late drive home through the rain")
+**The Listening Room** turns a natural-language mood
 into a real Spotify playlist in the user's account. A large language model proposes a
 tracklist; the user curates it; the backend resolves each track against Spotify's catalog
 and writes a private playlist.
 
-One-sentence architecture: **a stateless FastAPI service brokers two side-effect-free
-concerns — LLM track generation and Spotify playlist creation — for a thin Expo/React
-Native client that owns the user's OAuth session entirely on-device.**
+Architecture: A stateless FastAPI service brokers two side-effect-free
+concerns; LLM track generation and Spotify playlist creation, for a thin Expo/React
+Native client that owns the user's OAuth session entirely on-device.
 
-The defining property of the design is that **the server holds no user state**: no
+The defining property of the design is that the server holds no user state: no
 database, no sessions, no stored tokens. Everything the server needs arrives in the
 request and is forgotten when the response is sent. Most of the interesting trade-offs in
 this document follow from that one choice.
@@ -29,7 +22,7 @@ this document follow from that one choice.
 
 ## 2. System context (C4 Level 1)
 
-This uses the [C4 model](https://c4model.com/) — a standard way to describe software
+This uses the [C4 model](https://c4model.com/), a standard way to describe software
 architecture at four zoom levels (Context → Container → Component → Code). Level 1 shows
 the system as a single box among its users and external dependencies.
 
@@ -53,8 +46,8 @@ the system as a single box among its users and external dependencies.
 ```
 
 Two external dependencies do the heavy lifting (OpenAI for ideas, Spotify for catalog and
-writes). The system's own job is **orchestration, validation, and trust-boundary
-enforcement** — not storage.
+writes). The system's own job is orchestration, validation, and trust-boundary
+enforcement, not storage.
 
 ---
 
@@ -69,8 +62,8 @@ Three deployable units share one core library:
 | **CLI** | `argparse` (`app.py`) | Developer/local entry point to the same core library |
 | _shared_ | `playlist_generator.py` | LLM call + Spotify resolve/create logic, imported by both API and CLI |
 
-Keeping the domain logic in `playlist_generator.py` and giving it **two thin entry points**
-(HTTP in `api.py`, CLI in `app.py`) is a deliberate *ports-and-adapters* / hexagonal
+Keeping the domain logic in `playlist_generator.py` and giving it two thin entry points
+(HTTP in `api.py`, CLI in `app.py`) is a deliberate ports-and-adapters/hexagonal
 arrangement: the business logic doesn't know or care whether it was invoked by a web
 request or a terminal. That separation is what makes the core unit-testable without a
 server (see §5, testing).
@@ -102,17 +95,12 @@ Mobile ──getAccessToken() (refresh if near-expiry, all on-device)
 Mobile shows ResultScreen ◄────────────────────────────────────────┘
 ```
 
-The two flows are **separate HTTP calls on purpose** (ADR-1). The user sees and edits the
+The two flows are separate HTTP calls on purpose (ADR-1). The user sees and edits the
 tracklist between them.
 
 ---
 
 ## 4. Architecture Decision Records (ADRs)
-
-Each decision uses a lightweight [ADR](https://adr.github.io/) format: **Context →
-Decision → Why not the alternatives → Consequences → Interview talking point.** ADRs are
-an industry-standard way to record *why* a choice was made so the reasoning survives the
-person who made it.
 
 ### ADR-1 — Split the workflow into two endpoints (`/generate`, then `/add-to-spotify`)
 
@@ -126,37 +114,27 @@ person who made it.
   write a clean retry boundary.
 - **Consequences.** The client is the source of truth for the in-progress tracklist. This
   fits a stateless server (the tracklist never needs storing) and maps cleanly onto REST:
-  `/generate` is safe/idempotent-ish, `/add-to-spotify` is the unsafe mutation.
-- **Interview talking point.** "I separated the idempotent read from the side-effecting
-  write so each has its own latency profile and failure semantics, and so a human curation
-  step fits naturally between them — the classic CQRS instinct of not overloading one
-  operation with both query and command."
+  `/generate` is safe, `/add-to-spotify` is the unsafe mutation.
 
-### ADR-2 — Stateless token pass-through; no database, no server sessions ⭐
+### ADR-2 — Stateless token pass-through; no database, no server sessions
 
 - **Context.** To write a playlist, the server needs the user's Spotify authorization. The
   conventional approach stores per-user OAuth tokens server-side.
-- **Decision.** The server stores **nothing**. The mobile client performs OAuth itself and
+- **Decision.** The server stores nothing. The mobile client performs OAuth itself and
   sends the access token in each `/add-to-spotify` body; the server uses it for exactly one
   request and discards it. `add_songs_with_token()` constructs a per-request Spotipy client
   bound to that token.
 - **Why not store tokens / sessions?** A token store means a database, encryption at rest,
-  key rotation, token-refresh cron jobs, GDPR/data-deletion obligations, and a juicy breach
-  target. For a single-purpose tool, that is enormous accidental complexity.
-- **Consequences.** The backend is **horizontally scalable by default** — any instance can
+  key rotation, token-refresh cron jobs, GDPR/data-deletion obligations. For a single-purpose tool, that is enormous accidental complexity.
+- **Consequences.** The backend is horizontally scalable by default, since any instance can
   serve any request because there is no session affinity and no shared state (a core
-  [12-Factor](https://12factor.net/) principle: *processes are stateless and
-  share-nothing*). The cost: the token travels in a request body, so transport security
+  [12-Factor](https://12factor.net/) principle: processes are stateless and
+  share-nothing). The cost: the token travels in a request body, so transport security
   (TLS) and not logging bodies are non-negotiable, and there's no server-side revocation.
-- **Interview talking point.** "I treated the backend as a stateless broker. The most
-  secure and cheapest data is the data you never store — no token DB means no breach surface
-  and trivial horizontal scaling. The trade-off I accepted is that the access token is in
-  the request body, so I lean entirely on TLS and disciplined logging, and I rely on
-  Spotify's own token expiry for revocation."
 
 ### ADR-3 — OAuth 2.0 Authorization Code + PKCE on a public client (no client secret)
 
-- **Context.** A mobile app is a *public client*: anything shipped in the binary can be
+- **Context.** A mobile app is a public client: anything shipped in the binary can be
   extracted, so it cannot keep a client secret.
 - **Decision.** Use the Authorization Code flow with **PKCE** ([RFC 7636](https://datatracker.ietf.org/doc/html/rfc7636)),
   implemented via `expo-auth-session`. The app generates a random `code_verifier`, sends its
@@ -168,10 +146,6 @@ person who made it.
   credential leak.
 - **Consequences.** No secret lives in the app. The `redirect_uri`
   (`spotifyplaylist://callback`) is a custom scheme that returns control to the app.
-- **Interview talking point.** "PKCE is the current standard for public clients — it
-  replaces the secret with a per-request proof-of-possession, so intercepting the auth code
-  is useless without the verifier. I also validate `state` for CSRF. This is exactly what
-  RFC 9700 (the OAuth Security BCP) now recommends over the deprecated Implicit flow."
 
 ### ADR-4 — The mobile token lives in memory only (forget on app close)
 
@@ -185,11 +159,7 @@ person who made it.
   sidesteps stale-token edge cases on shared devices.
 - **Consequences.** Re-pair on each launch; the in-app OAuth round-trip keeps the process
   alive so login still works within a session, and the access token still auto-refreshes for
-  long sessions. (See the matching mobile commit.)
-- **Interview talking point.** "I made the privacy-preserving choice the default: tokens in
-  volatile memory mean closing the app forgets you. It's *more* private than encrypted-at-rest
-  storage because there's simply nothing persisted — and it composes with the stateless
-  backend: neither tier retains the credential."
+  long sessions.
 
 ### ADR-5 — Treat the LLM as a constrained structured-data generator, not a chatbot
 
@@ -201,15 +171,11 @@ person who made it.
   3. **Defensive parsing** — even with the above, the code assumes the model can lie: it
      catches `JSONDecodeError`, checks `tracks` is a non-empty list, and filters out items
      that aren't `{str song, str artist}` before returning.
-- **Why not trust the model / free-text parse?** LLM output is *untrusted input*. Regexing
+- **Why not trust the model / free-text parse?** LLM output is untrusted input. Regexing
   prose is brittle; trusting JSON mode alone still lets through wrong-shaped objects.
 - **Consequences.** Bad model output degrades gracefully (filtered or a clean `ValueError`)
   instead of crashing or poisoning downstream Spotify calls. `max_tokens` scales with
   `count` to bound cost/latency.
-- **Interview talking point.** "I never trust model output structurally. JSON mode plus a
-  few-shot exemplar gets the shape right ~99% of the time; the defensive validation layer
-  handles the other 1%. Same mindset as validating any third-party API — the LLM is just an
-  especially creative upstream."
 
 ### ADR-6 — Pydantic models as the single trust boundary
 
@@ -222,23 +188,17 @@ person who made it.
   handlers. Declarative schemas keep the contract in one place and self-document.
 - **Consequences.** Garbage requests are rejected at the edge before touching OpenAI/Spotify
   (cost + abuse control). The bounds also cap blast radius (e.g. ≤ 50 Spotify writes).
-- **Interview talking point.** "Validation is a security control, not a nicety. Pydantic is
-  my trust boundary: bounded prompt length, bounded track count, bounded token size — every
-  field that crosses the wire has an explicit min/max, which doubles as input-abuse defense."
 
 ### ADR-7 — Spotify resolution: best-effort search with dedupe and skip-tracking
 
-- **Context.** The LLM returns *song + artist strings*; Spotify needs *track IDs*.
-- **Decision.** For each suggestion, search Spotify (`limit=1`), take the top hit, **dedupe
-  by track ID** via a `seen` set, and collect un-findable songs into a `skipped` list
-  returned to the client. If *nothing* resolves, raise — don't create an empty playlist.
+- **Context.** The LLM returns song + artist strings; Spotify needs track IDs.
+- **Decision.** For each suggestion, search Spotify (`limit=1`), take the top hit, dedupe
+  by track ID via a `seen` set, and collect un-findable songs into a `skipped` list
+  returned to the client. If nothing resolves, raise and don't create an empty playlist.
 - **Why not fail on the first miss?** Partial success is the right UX: deliver the 18 tracks
   that matched and transparently report the 2 that didn't.
 - **Consequences.** The result surfaces `added_count` and `skipped[]`, and the UI shows
   "N unaccounted for." Dedupe prevents the model's repeats from doubling a track.
-- **Interview talking point.** "I designed for partial success and made it observable to the
-  user. Dedupe-by-ID handles the model suggesting the same song twice, and the skip list
-  turns silent data loss into transparent feedback."
 
 ### ADR-8 — FastAPI + Uvicorn, containerized, on Railway
 
@@ -248,12 +208,9 @@ person who made it.
 - **Why not Flask/Django?** Flask lacks built-in validation/schemas; Django is far too heavy
   for two endpoints and no DB. FastAPI hits the sweet spot.
 - **Consequences.** The Dockerfile follows container best practices: pinned slim base,
-  layer-cached deps (`COPY requirements.txt` before code), a **non-root user**, and
+  layer-cached deps (`COPY requirements.txt` before code), a non-root user, and
   `--proxy-headers` so client IPs survive Railway's proxy (used by the rate limiter).
-- **Interview talking point.** "FastAPI gave me validation, docs, and async on one stack.
-  The container runs as a non-root user and orders layers for cache hits — small things, but
-  they're the difference between a demo image and a deployable one."
-
+  
 ---
 
 ## 5. Cross-cutting concerns
@@ -263,11 +220,11 @@ person who made it.
 - **Broken auth (API2):** PKCE on the client (ADR-3); the server never holds long-lived
   creds (ADR-2). Spotify enforces token validity; a `401` from Spotify is surfaced to the
   client which then forces re-pairing.
-- **Unrestricted resource consumption (API4):** per-IP **rate limiting** (`10/hour` per
-  endpoint via SlowAPI), a **64 KB request-body cap** (custom middleware → `413`), and
+- **Unrestricted resource consumption (API4):** per-IP rate limiting (`10/hour` per
+  endpoint via SlowAPI), a 64 KB request-body cap (custom middleware → `413`), and
   bounded fields (ADR-6). `max_tokens` caps LLM spend.
 - **Injection / unsafe input:** all inputs schema-validated; LLM output re-validated (ADR-5/6).
-- **Security misconfiguration (API8):** **CORS is allow-list driven** from
+- **Security misconfiguration (API8):** CORS is allow-list driven from
   `ALLOWED_ORIGINS` and restricted to `POST` + `Content-Type`; secrets come from the
   environment, never the repo (`.env.example` is the template).
 - **Transport:** tokens ride in request bodies, so HTTPS is mandatory and bodies are never
@@ -281,13 +238,13 @@ person who made it.
 - **Error taxonomy → HTTP semantics:** malformed model output → `502` (upstream's fault);
   unexpected generation failure → `500`; invalid/expired Spotify token → `401`; other
   Spotify failures → `502`; validation → `422`; oversized body → `413`. Clients get
-  *actionable* status codes, and internal exceptions are logged but never leaked in the
+  actionable status codes, and internal exceptions are logged but never leaked in the
   response body.
 - **Graceful partial failure:** the skip list (ADR-7).
 
 ### Observability
 
-Structured-ish logging via the stdlib `logging` module with `logger.exception(...)` on
+Structured logging via the stdlib `logging` module with `logger.exception(...)` on
 every failure path (full traceback server-side, generic message client-side). Log level is
 env-driven (`LOG_LEVEL`). This is the seam where real observability (structured JSON logs,
 request IDs, metrics, tracing) would attach — see §6.
@@ -298,20 +255,20 @@ The [test pyramid](https://martinfowler.com/articles/practical-test-pyramid.html
 many fast unit tests, fewer integration tests, few end-to-end. The suite reflects it:
 
 - **Unit tests** (`test_playlist_generator.py`): the OpenAI client and Spotipy are
-  **mocked at the boundary**, so logic (JSON cleaning, dedupe, skip, "no tracks found") is
+  mocked at the boundary, so logic (JSON cleaning, dedupe, skip, "no tracks found") is
   tested deterministically with zero network and zero cost.
 - **API/integration tests** (`test_api.py`): FastAPI's `TestClient` exercises the real
   validation + error-mapping stack (422/413/401/500/502 paths) with the domain layer
   patched.
-- **Boundary discipline:** tests patch *exactly* the external edge (`api.get_playlist`,
-  `playlist_generator.spotipy.Spotify`) — never internal functions — so refactors don't
+- **Boundary discipline:** tests patch exactly the external edge (`api.get_playlist`,
+  `playlist_generator.spotipy.Spotify`), never internal functions, so refactors don't
   break tests spuriously.
 
 ### Configuration & secrets (12-Factor)
 
 Config is read from the environment (`dotenv_values(".env")` merged under `os.environ`, so
 real env vars win). Mobile build-time config travels via `eas.json` `EXPO_PUBLIC_*` vars.
-Nothing secret is committed. This is 12-Factor's *config in the environment* factor and is
+Nothing secret is committed. This is 12-Factor's config in the environment factor and is
 what lets the same image run in dev and prod unchanged.
 
 ---
@@ -326,79 +283,70 @@ most of this easy.**
 
 Because the server is share-nothing (ADR-2), scaling out is "run more replicas behind a
 load balancer." No session affinity, no sticky routing. Railway → multiple instances, or
-move to a container orchestrator. This is the dividend of statelessness: **the easy scaling
-axis is already free.**
+move to a container orchestrator. This is the dividend of statelessness: the easy scaling
+axis is already free.
 
 ### Layer 2 — Protect and cache the upstreams (10×–100×)
 
 The real bottlenecks are OpenAI and Spotify (latency, rate limits, cost), not our CPU.
 
 - **Caching (read path):** identical `/generate` prompts can serve a cached tracklist
-  (Redis, keyed by normalized prompt+count, short TTL). Spotify **search results** cache
-  well too (song+artist → track ID rarely changes) — this collapses the per-request N
+  (Redis, keyed by normalized prompt+count, short TTL). Spotify search results cache
+  well too (song+artist → track ID rarely changes); this collapses the per-request N
   searches dramatically. Introduces the classic cache concerns: invalidation, stampede
   (use single-flight / request coalescing).
 - **Resilience patterns:** add **circuit breakers** around OpenAI/Spotify so a provider
-  outage sheds load fast instead of piling up timeouts; **exponential backoff with jitter**
+  outage sheds load fast instead of piling up timeouts; exponential backoff with jitter
   and respect for Spotify's `Retry-After` on `429`.
 - **Distributed rate limiting:** SlowAPI's in-process counters don't share state across
-  replicas — move the limiter to a **Redis backend** so limits are global, not per-instance.
+  replicas. Move the limiter to a Redis backend so limits are global, not per-instance.
 
 ### Layer 3 — Make the write path asynchronous (100×)
 
-`/add-to-spotify` does N sequential searches + writes — slow and tied to one HTTP request.
+`/add-to-spotify` does N sequential searches + writes —> slow and tied to one HTTP request.
 At scale:
 
 - **Job queue:** accept the request, enqueue it (SQS/Celery/RQ), return `202 Accepted` with
   a status URL; a worker pool does the Spotify work and the client polls or gets a push.
   This decouples request latency from upstream latency and lets writes retry independently.
-- **Idempotency:** give each submission an **idempotency key** so a retried "create
-  playlist" doesn't create duplicates — the standard pattern for safe retries on
+- **Idempotency:** give each submission an idempotency key so a retried "create
+  playlist" doesn't create duplicates. The standard pattern for safe retries on
   non-idempotent operations (what Stripe/payment APIs do).
 - **Batch the Spotify calls:** `user_playlist_add_tracks` already takes a list; search is
-  the per-item cost — parallelize searches with a bounded worker pool.
+  the per-item cost, parallelize searches with a bounded worker pool.
 
 ### Layer 4 — When you finally need state (100×–1000×)
 
-State enters only when the *product* demands it (accounts, playlist history,
-edit-before-add persistence — the deferred Phase-2 features), not because scaling forces it.
+State enters only when the product demands it (accounts, playlist history,
+edit-before-add persistence), not because scaling forces it.
 At that point:
 
 - **Datastore:** Postgres for relational user/playlist data; tokens (if persisted) in a
-  KMS-encrypted store with rotation — re-opening the ADR-2 trade-off deliberately, not by
-  accident.
+  KMS-encrypted store with rotation.
 - **Read replicas / partitioning** as the data grows; cache-aside in front.
 
 ### Layer 5 — Operate it (cross-cutting at every scale)
 
-- **Observability:** structured JSON logs with **correlation/request IDs**, RED metrics
-  (Rate/Errors/Duration) per endpoint and per upstream, and **distributed tracing**
+- **Observability:** structured JSON logs with correlation/request IDs, RED metrics
+  (Rate/Errors/Duration) per endpoint and per upstream, and distributed tracing
   (OpenTelemetry) so an OpenAI slowdown is visible as a span, not a mystery.
 - **Cost controls:** per-user and global LLM budgets, cheaper/distilled models for simple
   prompts, and the cache above (the cheapest token is the one you don't spend).
 - **Multi-region** only once latency or availability SLOs demand it; the stateless tier
   makes active-active straightforward, the datastore is the hard part.
 
-**The through-line:** the stateless, share-nothing core means the first 10×–100× is mostly
-"add replicas + a cache + a queue." State and its complexity are deferred until the product
-genuinely needs them — which is exactly the order you want to add complexity in.
-
 ---
 
 ## 7. Known limitations & future work
 
-- **No accounts / history / persistence** — deferred Phase-2 (by design, per ADR-2).
-- **In-process rate limiting** doesn't span replicas (fine for one instance; see §6 Layer 2).
-- **No automated retries/circuit breakers** on upstreams yet — timeouts only.
-- **Re-pair on every cold start** (ADR-4) is a deliberate privacy choice, not for everyone.
 - **Top-1 Spotify match** can occasionally pick the wrong recording (live vs. studio); a
-  scoring/disambiguation pass would improve precision.
+  scoring pass would improve precision.
 - **No CI pipeline described** — tests exist; wiring them to run on every push is the next
   hygiene step.
 
 ---
 
-## 8. Interview Q&A appendix
+## 8. Appendix
 
 **Q: Why no database?**
 The product needs no server-side state: the client owns the in-progress tracklist and its
@@ -413,9 +361,9 @@ lifetime. The alternative — storing tokens server-side — trades that transie
 a permanent, high-value data store to defend. (ADR-2)
 
 **Q: How do you stop the LLM from inventing songs that don't exist?**
-I don't fully — I design for it. The model's output is untrusted: JSON mode + a few-shot
+I don't fully; I design for it. The model's output is untrusted: JSON mode + a few-shot
 exemplar fix the shape, defensive parsing drops malformed items, and the Spotify resolve
-step is the reality check — anything that doesn't resolve to a real catalog track lands in
+step is the reality check. Anything that doesn't resolve to a real catalog track lands in
 the transparent `skipped` list rather than the playlist. (ADR-5/7)
 
 **Q: Why two endpoints instead of one?**
@@ -426,11 +374,10 @@ tracklist between calls). (ADR-1)
 **Q: How would you make `/add-to-spotify` safe to retry?**
 Idempotency keys: the client sends a unique key per submission; the server (with a small
 store at that point) records the key→result so a retried create returns the original result
-instead of making a second playlist. Today it's not idempotent — that's the honest answer.
-(§6 Layer 3)
+instead of making a second playlist.
 
 **Q: What's the bottleneck, and how do you scale it?**
-Not our CPU — it's the upstreams. Cache `/generate` results and Spotify search lookups in
+It's the upstreams. Cache `/generate` results and Spotify search lookups in
 Redis, coalesce duplicate in-flight requests, add circuit breakers + backoff, and move the
 write path onto a job queue returning `202`. The stateless API itself scales by adding
 replicas. (§6)
@@ -438,18 +385,17 @@ replicas. (§6)
 **Q: What is PKCE and why use it?**
 Proof Key for Code Exchange (RFC 7636). A public client can't keep a secret, so it generates
 a random verifier, sends its hash up front, and proves possession when redeeming the auth
-code — making a stolen code useless. It's the modern replacement for the deprecated Implicit
+code, making a stolen code useless. It's the modern replacement for the deprecated Implicit
 flow. (ADR-3)
 
 **Q: How do you handle a Spotify token expiring mid-session?**
 The client refreshes proactively when within 60 s of expiry. If a refresh fails, the API
-surfaces Spotify's `401`, the app clears the session and routes the user back to re-pair —
-a clean, explicit recovery rather than a silent error. (ADR-3/4)
+surfaces Spotify's `401`, the app clears the session and routes the user back to re-pair. (ADR-3/4)
 
 **Q: How are errors represented?**
 A deliberate taxonomy mapped to HTTP: `422` validation, `413` oversized body, `401` bad
 token, `502` upstream returned garbage, `500` unexpected. Full tracebacks are logged
-server-side; clients get an actionable status and a safe message — never an internal stack
+server-side; clients get an actionable status and a safe message, never an internal stack
 trace. (§5)
 
 **Q: How is it tested without hitting OpenAI/Spotify?**
@@ -473,24 +419,3 @@ stateless endpoints. FastAPI gives Pydantic validation, OpenAPI docs, and ASGI a
 stack. (ADR-8)
 
 ---
-
-## 9. Glossary of standards & patterns referenced
-
-- **OAuth 2.0** ([RFC 6749](https://datatracker.ietf.org/doc/html/rfc6749)) — delegated authorization framework.
-- **PKCE** ([RFC 7636](https://datatracker.ietf.org/doc/html/rfc7636)) — proof-of-possession for public OAuth clients.
-- **OAuth 2.0 Security BCP** ([RFC 9700](https://datatracker.ietf.org/doc/html/rfc9700)) — deprecates Implicit flow, mandates PKCE.
-- **REST / HTTP status semantics** — resources + meaningful status codes; the Richardson Maturity Model frames REST "levels."
-- **12-Factor App** ([12factor.net](https://12factor.net/)) — stateless processes, config in the environment.
-- **C4 model** ([c4model.com](https://c4model.com/)) — Context/Container/Component/Code architecture diagrams.
-- **ADR** ([adr.github.io](https://adr.github.io/)) — Architecture Decision Records.
-- **OWASP API Security Top 10** ([owasp.org/API-Security](https://owasp.org/API-Security/)) — the API threat checklist.
-- **Test pyramid** (Fowler) — many unit, fewer integration, few E2E.
-- **Resilience patterns** — timeouts, circuit breaker, exponential backoff + jitter, bulkhead (Nygard, *Release It!*).
-- **Idempotency keys** — safe retries for non-idempotent operations (Stripe-style).
-- **Cache-aside, single-flight/request coalescing, RED metrics, OpenTelemetry** — operational standards referenced in §6.
-- **Ports & adapters (hexagonal architecture)** — domain core with thin HTTP/CLI adapters.
-
----
-
-*End of document. Pair this with the README (user-facing) and the `docs/superpowers/`
-specs/plans (build history) for the full picture.*

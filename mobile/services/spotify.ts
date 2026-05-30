@@ -6,10 +6,14 @@ import * as Crypto from 'expo-crypto';
 WebBrowser.maybeCompleteAuthSession();
 
 const CLIENT_ID = process.env.EXPO_PUBLIC_SPOTIFY_CLIENT_ID;
-if (!CLIENT_ID) {
-  throw new Error(
-    'EXPO_PUBLIC_SPOTIFY_CLIENT_ID is not set. Add it to mobile/.env before building.'
-  );
+
+function requireClientId(): string {
+  if (!CLIENT_ID) {
+    throw new Error(
+      'Missing EXPO_PUBLIC_SPOTIFY_CLIENT_ID. Set it in eas.json before building.'
+    );
+  }
+  return CLIENT_ID;
 }
 
 const REDIRECT_URI = AuthSession.makeRedirectUri({ scheme: 'spotifyplaylist' });
@@ -56,7 +60,7 @@ export async function connectSpotify(): Promise<void> {
   const state = base64URLEncode(stateBytes);
 
   const authUrl =
-    `${AUTH_ENDPOINT}?client_id=${CLIENT_ID}` +
+    `${AUTH_ENDPOINT}?client_id=${requireClientId()}` +
     `&response_type=code` +
     `&redirect_uri=${encodeURIComponent(REDIRECT_URI)}` +
     `&scope=${encodeURIComponent(SCOPES)}` +
@@ -81,7 +85,7 @@ export async function connectSpotify(): Promise<void> {
     grant_type: 'authorization_code',
     code: code,
     redirect_uri: REDIRECT_URI,
-    client_id: CLIENT_ID,
+    client_id: requireClientId(),
     code_verifier: codeVerifier,
   });
 
@@ -115,7 +119,7 @@ async function refreshAccessToken(): Promise<string> {
     const body = new URLSearchParams({
       grant_type: 'refresh_token',
       refresh_token: refreshToken,
-      client_id: CLIENT_ID,
+      client_id: requireClientId(),
     });
 
     const res = await timedFetch(TOKEN_ENDPOINT, {

@@ -1,10 +1,14 @@
 import { Track } from '../App';
 
 const BACKEND_URL = process.env.EXPO_PUBLIC_BACKEND_URL;
-if (!BACKEND_URL) {
-  throw new Error(
-    'EXPO_PUBLIC_BACKEND_URL is not set. Add it to mobile/.env before building.'
-  );
+
+function requireBackendUrl(): string {
+  if (!BACKEND_URL) {
+    throw new Error(
+      'Missing EXPO_PUBLIC_BACKEND_URL. Set it in eas.json before building.'
+    );
+  }
+  return BACKEND_URL;
 }
 
 const REQUEST_TIMEOUT_MS = 30_000;
@@ -31,7 +35,7 @@ export async function generatePlaylist(params: {
   decade?: string;
   mood?: string;
 }): Promise<Track[]> {
-  const response = await timedFetch(`${BACKEND_URL}/generate`, {
+  const response = await timedFetch(`${requireBackendUrl()}/generate`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),
@@ -49,7 +53,7 @@ export async function addToSpotify(params: {
   tracks: Track[];
   spotify_token: string;
 }): Promise<{ added_count: number; skipped: string[]; playlist_url: string }> {
-  const response = await timedFetch(`${BACKEND_URL}/add-to-spotify`, {
+  const response = await timedFetch(`${requireBackendUrl()}/add-to-spotify`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params),

@@ -1,6 +1,5 @@
 import * as AuthSession from 'expo-auth-session';
 import * as WebBrowser from 'expo-web-browser';
-import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -25,11 +24,11 @@ const AUTH_ENDPOINT = 'https://accounts.spotify.com/authorize';
 const SCOPES = 'playlist-modify-private user-read-private';
 const TOKEN_REQUEST_TIMEOUT_MS = 15_000;
 
-const KEYS = {
-  accessToken: 'spotify_access_token',
-  refreshToken: 'spotify_refresh_token',
-  expiresAt: 'spotify_expires_at',
-};
+// The session lives only in memory, for the lifetime of the running app.
+// Closing the app (a cold start) wipes it, so the user lands back on the
+// pairing screen and must reconnect Spotify — nothing is persisted to disk.
+type Session = { accessToken: string; refreshToken: string; expiresAt: number };
+let session: Session | null = null;
 
 function base64URLEncode(bytes: Uint8Array): string {
   return btoa(Array.from(bytes).map(b => String.fromCharCode(b)).join(''))
@@ -103,11 +102,11 @@ export async function connectSpotify(): Promise<void> {
   }
 
   const tokens = await tokenRes.json();
-  const expiresAt = Date.now() + tokens.expires_in * 1000;
-
-  await SecureStore.setItemAsync(KEYS.accessToken, tokens.access_token);
-  await SecureStore.setItemAsync(KEYS.refreshToken, tokens.refresh_token);
-  await SecureStore.setItemAsync(KEYS.expiresAt, String(expiresAt));
+  session = {
+    accessToken: tokens.access_token,
+    refreshToken: tokens.refresh_token,
+    expiresAt: Date.now() + tokens.expires_in * 1000,
+  };
 }
 
 let pendingRefresh: Promise<string> | null = null;
@@ -116,12 +115,12 @@ async function refreshAccessToken(): Promise<string> {
   if (pendingRefresh) return pendingRefresh;
 
   pendingRefresh = (async () => {
-    const refreshToken = await SecureStore.getItemAsync(KEYS.refreshToken);
-    if (!refreshToken) throw new Error('No refresh token — please reconnect Spotify.');
+    const current = session;
+    if (!current) throw new Error('Not connected — please reconnect Spotify.');
 
     const body = new URLSearchParams({
       grant_type: 'refresh_token',
-      refresh_token: refreshToken,
+      refresh_token: current.refreshToken,
       client_id: requireClientId(),
     });
 
@@ -137,15 +136,13 @@ async function refreshAccessToken(): Promise<string> {
     }
 
     const tokens = await res.json();
-    const expiresAt = Date.now() + tokens.expires_in * 1000;
+    session = {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token ?? current.refreshToken,
+      expiresAt: Date.now() + tokens.expires_in * 1000,
+    };
 
-    await SecureStore.setItemAsync(KEYS.accessToken, tokens.access_token);
-    await SecureStore.setItemAsync(KEYS.expiresAt, String(expiresAt));
-    if (tokens.refresh_token) {
-      await SecureStore.setItemAsync(KEYS.refreshToken, tokens.refresh_token);
-    }
-
-    return tokens.access_token as string;
+    return session.accessToken;
   })();
 
   try {
@@ -156,21 +153,16 @@ async function refreshAccessToken(): Promise<string> {
 }
 
 export async function getAccessToken(): Promise<string> {
-  const expiresAt = Number(await SecureStore.getItemAsync(KEYS.expiresAt) ?? '0');
-  const token = await SecureStore.getItemAsync(KEYS.accessToken);
-  if (token && Date.now() < expiresAt - 60_000) {
-    return token;
+  if (session && Date.now() < session.expiresAt - 60_000) {
+    return session.accessToken;
   }
   return refreshAccessToken();
 }
 
 export async function isConnected(): Promise<boolean> {
-  const token = await SecureStore.getItemAsync(KEYS.accessToken);
-  return token !== null;
+  return session !== null;
 }
 
 export async function disconnect(): Promise<void> {
-  await SecureStore.deleteItemAsync(KEYS.accessToken);
-  await SecureStore.deleteItemAsync(KEYS.refreshToken);
-  await SecureStore.deleteItemAsync(KEYS.expiresAt);
+  session = null;
 }

@@ -1,15 +1,16 @@
 import { useState, useCallback } from 'react';
 import {
   View, Text, TextInput, StyleSheet, ScrollView,
-  TouchableOpacity, ActivityIndicator, Alert, StatusBar,
+  Pressable, ActivityIndicator, Alert, StatusBar, SafeAreaView,
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { RootStackParamList } from '../App';
 import { generatePlaylist } from '../services/api';
 import { connectSpotify, isConnected } from '../services/spotify';
-import { colors, shadow } from '../theme';
+import { colors, type, spacing, radii, hairline, shadow, fonts } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -35,13 +36,13 @@ export default function HomeScreen({ navigation }: Props) {
       await connectSpotify();
       setConnected(true);
     } catch (e: any) {
-      Alert.alert('Connection failed', e.message);
+      Alert.alert('Unable to connect', e.message);
     }
   }
 
   async function handleGenerate() {
     if (!prompt.trim()) {
-      Alert.alert('', 'Describe your playlist first.');
+      Alert.alert('A moment', 'Describe the evening you have in mind.');
       return;
     }
     setLoading(true);
@@ -49,7 +50,7 @@ export default function HomeScreen({ navigation }: Props) {
       const tracks = await generatePlaylist({ prompt, count, genre, decade, mood });
       navigation.navigate('Preview', { tracks, playlistName: prompt });
     } catch (e: any) {
-      Alert.alert('Error', e.message);
+      Alert.alert('Couldn’t generate', e.message);
     } finally {
       setLoading(false);
     }
@@ -58,122 +59,332 @@ export default function HomeScreen({ navigation }: Props) {
   if (!connected) {
     return (
       <View style={styles.connectScreen}>
-        <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
-        <View style={styles.logoBlock}>
-          <Text style={styles.logoMark}>♫</Text>
-          <Text style={styles.appName}>Playlist{'\n'}Generator</Text>
-        </View>
-        <Text style={styles.connectHint}>Connect your Spotify to begin</Text>
-        <TouchableOpacity style={[styles.connectBtn, shadow.green]} onPress={handleConnect} activeOpacity={0.8}>
-          <Text style={styles.connectBtnText}>Connect Spotify</Text>
-        </TouchableOpacity>
+        <StatusBar barStyle="light-content" backgroundColor={colors.bgDeep} />
+        <LinearGradient
+          colors={[colors.bgDeep, colors.bg, colors.bgVignette]}
+          locations={[0, 0.55, 1]}
+          style={StyleSheet.absoluteFill}
+        />
+
+        <SafeAreaView style={styles.connectSafe}>
+          <View style={styles.connectTopRule}>
+            <View style={styles.rule} />
+            <Text style={styles.monogram}>k · k</Text>
+            <View style={styles.rule} />
+          </View>
+
+          <View style={styles.connectBody}>
+            <Text style={styles.eyebrow}>est. an evening at a time</Text>
+            <Text style={styles.connectDisplay}>
+              The{'\n'}
+              <Text style={styles.italicAccent}>listening{'\n'}room.</Text>
+            </Text>
+            <View style={styles.ornamentRow}>
+              <View style={styles.ruleShort} />
+              <Text style={styles.ornament}>✦</Text>
+              <View style={styles.ruleShort} />
+            </View>
+            <Text style={styles.connectLede}>
+              A quiet correspondent for the records you haven’t yet met. Tell it the mood; it
+              will assemble the side.
+            </Text>
+          </View>
+
+          <View style={styles.connectFooter}>
+            <Pressable
+              onPress={handleConnect}
+              style={({ pressed }) => [styles.connectBtn, pressed && styles.pressed]}
+            >
+              <Text style={styles.connectBtnNum}>I.</Text>
+              <Text style={styles.connectBtnText}>Pair with Spotify</Text>
+              <Text style={styles.connectBtnArrow}>↗</Text>
+            </Pressable>
+            <Text style={styles.fineprint}>
+              authorised via spotify · oauth pkce · scope: <Text style={styles.fineprintItalic}>playlist-modify-private</Text>
+            </Text>
+          </View>
+        </SafeAreaView>
       </View>
     );
   }
 
   return (
-    <ScrollView
-      style={styles.scroll}
-      contentContainerStyle={styles.container}
-      keyboardShouldPersistTaps="handled"
-    >
+    <View style={styles.screen}>
       <StatusBar barStyle="light-content" backgroundColor={colors.bg} />
-
-      <Text style={styles.sectionLabel}>DESCRIBE YOUR VIBE</Text>
-      <TextInput
-        style={styles.promptInput}
-        placeholder="late night drive through the city..."
-        placeholderTextColor={colors.dim}
-        value={prompt}
-        onChangeText={setPrompt}
-        multiline
-        returnKeyType="done"
-      />
-
-      <Text style={styles.sectionLabel}>REFINE  <Text style={styles.sectionLabelOptional}>optional</Text></Text>
-      <View style={styles.row}>
-        <TextInput style={styles.chipInput} placeholder="genre" placeholderTextColor={colors.dim} value={genre} onChangeText={setGenre} />
-        <TextInput style={styles.chipInput} placeholder="decade" placeholderTextColor={colors.dim} value={decade} onChangeText={setDecade} />
-        <TextInput style={styles.chipInput} placeholder="mood" placeholderTextColor={colors.dim} value={mood} onChangeText={setMood} />
-      </View>
-
-      <View style={styles.countRow}>
-        <Text style={styles.sectionLabel}>SONGS</Text>
-        <Text style={styles.countNum}>{count}</Text>
-      </View>
-      <Slider
-        minimumValue={1}
-        maximumValue={50}
-        step={1}
-        value={count}
-        onValueChange={(v) => setCount(Math.round(v))}
-        minimumTrackTintColor={colors.green}
-        maximumTrackTintColor={colors.border}
-        thumbTintColor={colors.green}
-        style={styles.slider}
-      />
-
-      <TouchableOpacity
-        style={[styles.generateBtn, loading && styles.disabled, shadow.green]}
-        onPress={handleGenerate}
-        disabled={loading}
-        activeOpacity={0.85}
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
       >
-        {loading
-          ? <ActivityIndicator color={colors.bg} />
-          : <Text style={styles.generateBtnText}>Generate Playlist</Text>}
-      </TouchableOpacity>
-    </ScrollView>
+        <View style={styles.masthead}>
+          <Text style={styles.eyebrow}>folio №01 · for tonight</Text>
+          <Text style={styles.mastheadTitle}>
+            Compose <Text style={styles.italicAccent}>a side.</Text>
+          </Text>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeadRow}>
+            <Text style={styles.sectionRoman}>I.</Text>
+            <Text style={styles.sectionLabel}>the brief</Text>
+          </View>
+          <View style={styles.parchment}>
+            <TextInput
+              style={styles.promptInput}
+              placeholder="late drive home through the rain&#10;after a long film…"
+              placeholderTextColor="#8A7B66"
+              value={prompt}
+              onChangeText={setPrompt}
+              multiline
+              returnKeyType="done"
+            />
+            <Text style={styles.parchmentSig}>— prompt</Text>
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeadRow}>
+            <Text style={styles.sectionRoman}>II.</Text>
+            <Text style={styles.sectionLabel}>refinements <Text style={styles.sectionLabelOptional}>(if any)</Text></Text>
+          </View>
+          <View style={styles.refineRow}>
+            <RefineField label="genre" value={genre} onChangeText={setGenre} placeholder="bossa" />
+            <RefineField label="decade" value={decade} onChangeText={setDecade} placeholder="'70s" />
+            <RefineField label="mood" value={mood} onChangeText={setMood} placeholder="hushed" />
+          </View>
+        </View>
+
+        <View style={styles.section}>
+          <View style={styles.sectionHeadRow}>
+            <Text style={styles.sectionRoman}>III.</Text>
+            <Text style={styles.sectionLabel}>length of the side</Text>
+            <View style={styles.flex1} />
+            <Text style={styles.lengthValue}>{String(count).padStart(2, '0')}<Text style={styles.lengthSuffix}> tracks</Text></Text>
+          </View>
+          <Slider
+            minimumValue={1}
+            maximumValue={50}
+            step={1}
+            value={count}
+            onValueChange={(v) => setCount(Math.round(v))}
+            minimumTrackTintColor={colors.brass}
+            maximumTrackTintColor={colors.hairline}
+            thumbTintColor={colors.brassBright}
+            style={styles.slider}
+          />
+          <View style={styles.tickRow}>
+            <Text style={styles.tick}>1</Text>
+            <Text style={styles.tick}>—</Text>
+            <Text style={styles.tick}>50</Text>
+          </View>
+        </View>
+
+        <Pressable
+          onPress={handleGenerate}
+          disabled={loading}
+          style={({ pressed }) => [
+            styles.generateBtn,
+            shadow.brass,
+            pressed && styles.pressed,
+            loading && styles.disabled,
+          ]}
+        >
+          {loading ? (
+            <ActivityIndicator color={colors.bgDeep} />
+          ) : (
+            <>
+              <Text style={styles.generateBtnText}>Compose the side</Text>
+              <Text style={styles.generateBtnArrow}>→</Text>
+            </>
+          )}
+        </Pressable>
+
+        <View style={styles.colophon}>
+          <View style={styles.rule} />
+          <Text style={styles.colophonText}>
+            <Text style={styles.colophonItalic}>set in fraunces & plex mono</Text>{'  ·  '}
+            <Text>composed locally · pressed in stockholm</Text>
+          </Text>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+function RefineField({
+  label, value, onChangeText, placeholder,
+}: { label: string; value: string; onChangeText: (s: string) => void; placeholder: string }) {
+  return (
+    <View style={styles.refineField}>
+      <Text style={styles.refineLabel}>{label}</Text>
+      <TextInput
+        style={styles.refineInput}
+        value={value}
+        onChangeText={onChangeText}
+        placeholder={placeholder}
+        placeholderTextColor="#5E5443"
+        autoCapitalize="none"
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  scroll: { flex: 1, backgroundColor: colors.bg },
-  container: { padding: 24, gap: 12, paddingBottom: 48 },
+  screen: { flex: 1, backgroundColor: colors.bg },
+  flex1: { flex: 1 },
+  pressed: { opacity: 0.86, transform: [{ scale: 0.995 }] },
+  disabled: { opacity: 0.45 },
 
-  connectScreen: {
-    flex: 1, backgroundColor: colors.bg,
-    justifyContent: 'center', alignItems: 'center', padding: 32, gap: 24,
+  // ── Connect screen ─────────────────────────────────────────
+  connectScreen: { flex: 1, backgroundColor: colors.bgDeep },
+  connectSafe: { flex: 1, paddingHorizontal: spacing.xl, justifyContent: 'space-between' },
+  connectTopRule: {
+    flexDirection: 'row', alignItems: 'center', gap: 14, marginTop: spacing.xl,
   },
-  logoBlock: { alignItems: 'center', gap: 8, marginBottom: 16 },
-  logoMark: { fontSize: 48, color: colors.green },
-  appName: {
-    fontSize: 36, fontWeight: '800', color: colors.white,
-    textAlign: 'center', lineHeight: 40, letterSpacing: -1,
+  rule: { flex: 1, height: hairline, backgroundColor: colors.hairline },
+  ruleShort: { width: 32, height: hairline, backgroundColor: colors.brassDeep },
+  monogram: {
+    fontFamily: fonts.serifItalic,
+    fontSize: 12, color: colors.brass, letterSpacing: 4,
+    textTransform: 'lowercase' as const,
   },
-  connectHint: { fontSize: 14, color: colors.muted, letterSpacing: 0.3 },
+
+  connectBody: { gap: spacing.l, marginTop: -spacing.xxl },
+  eyebrow: {
+    fontFamily: fonts.mono, fontSize: 10, color: colors.brass,
+    letterSpacing: 3, textTransform: 'uppercase',
+  },
+  connectDisplay: {
+    fontFamily: fonts.serifBold, fontSize: 64, lineHeight: 64,
+    color: colors.ink, letterSpacing: -2.4,
+  },
+  italicAccent: {
+    fontFamily: fonts.serifBlackItalic, color: colors.brassBright,
+  },
+  ornamentRow: {
+    flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4,
+  },
+  ornament: { color: colors.brass, fontSize: 12 },
+  connectLede: {
+    fontFamily: fonts.serif, fontSize: 16, lineHeight: 24,
+    color: colors.inkMid, maxWidth: 320,
+  },
+
+  connectFooter: { gap: spacing.m, marginBottom: spacing.xl },
   connectBtn: {
-    backgroundColor: colors.green, paddingVertical: 16, paddingHorizontal: 40,
-    borderRadius: 50, marginTop: 8,
+    flexDirection: 'row', alignItems: 'center', gap: 12,
+    backgroundColor: 'transparent',
+    borderTopWidth: hairline, borderBottomWidth: hairline,
+    borderColor: colors.brassDeep,
+    paddingVertical: 22, paddingHorizontal: 4,
   },
-  connectBtnText: { color: colors.bg, fontSize: 16, fontWeight: '700', letterSpacing: 0.3 },
+  connectBtnNum: {
+    fontFamily: fonts.serifItalic, fontSize: 18, color: colors.brass, width: 28,
+  },
+  connectBtnText: {
+    flex: 1,
+    fontFamily: fonts.serifMedium, fontSize: 22, color: colors.ink,
+    letterSpacing: -0.4,
+  },
+  connectBtnArrow: { fontFamily: fonts.serif, fontSize: 20, color: colors.brass },
+  fineprint: {
+    fontFamily: fonts.mono, fontSize: 10, color: colors.dim,
+    letterSpacing: 1.4, textAlign: 'center',
+  },
+  fineprintItalic: { fontFamily: fonts.serifItalic, fontSize: 11, color: colors.muted },
 
-  sectionLabel: {
-    fontSize: 10, fontWeight: '700', color: colors.muted,
-    letterSpacing: 2, marginBottom: 4,
+  // ── Form screen ────────────────────────────────────────────
+  container: {
+    paddingHorizontal: spacing.l,
+    paddingTop: spacing.xl + spacing.s,
+    paddingBottom: spacing.xxl,
+    gap: spacing.l,
   },
-  sectionLabelOptional: {
-    fontSize: 10, fontWeight: '400', color: colors.dim,
-    letterSpacing: 1, textTransform: 'lowercase',
+
+  masthead: { gap: 10, marginBottom: spacing.s, paddingBottom: spacing.m, borderBottomWidth: hairline, borderBottomColor: colors.hairlineSoft },
+  mastheadTitle: {
+    fontFamily: fonts.serifBold, fontSize: 44, lineHeight: 46,
+    color: colors.ink, letterSpacing: -1.6,
+  },
+
+  section: { gap: spacing.s },
+  sectionHeadRow: { flexDirection: 'row', alignItems: 'baseline', gap: 10 },
+  sectionRoman: {
+    fontFamily: fonts.serifItalic, fontSize: 14, color: colors.brass,
+    width: 22,
+  },
+  sectionLabel: {
+    fontFamily: fonts.serifItalic, fontSize: 15, color: colors.inkMid,
+    letterSpacing: -0.2,
+  },
+  sectionLabelOptional: { color: colors.muted, fontSize: 13 },
+
+  // parchment input
+  parchment: {
+    backgroundColor: colors.parchment,
+    borderRadius: radii.card,
+    paddingTop: spacing.m, paddingHorizontal: spacing.m, paddingBottom: 10,
+    minHeight: 132,
+    borderWidth: hairline,
+    borderColor: '#C9BB9D',
+    ...shadow.soft,
   },
   promptInput: {
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: 12, padding: 16, fontSize: 17, color: colors.white,
-    minHeight: 90, textAlignVertical: 'top', lineHeight: 24,
+    fontFamily: fonts.serif, fontSize: 17, lineHeight: 24,
+    color: colors.parchmentInk,
+    textAlignVertical: 'top',
+    minHeight: 84,
+    padding: 0,
   },
-  row: { flexDirection: 'row', gap: 8 },
-  chipInput: {
-    flex: 1, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-    borderRadius: 8, paddingVertical: 10, paddingHorizontal: 12,
-    fontSize: 13, color: colors.white, textAlign: 'center',
+  parchmentSig: {
+    fontFamily: fonts.serifItalic, fontSize: 12, color: '#9A8868',
+    textAlign: 'right',
   },
-  countRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: -4 },
-  countNum: { fontSize: 14, fontWeight: '600', color: colors.green, fontFamily: 'Courier New' },
-  slider: { marginHorizontal: -4 },
+
+  // refine row
+  refineRow: { flexDirection: 'row', gap: spacing.s },
+  refineField: {
+    flex: 1, paddingVertical: 10, paddingHorizontal: 4,
+    borderBottomWidth: hairline, borderBottomColor: colors.hairline,
+    gap: 4,
+  },
+  refineLabel: {
+    fontFamily: fonts.serifItalic, fontSize: 11, color: colors.brass,
+  },
+  refineInput: {
+    fontFamily: fonts.serif, fontSize: 16, color: colors.ink,
+    padding: 0,
+  },
+
+  // length
+  lengthValue: {
+    fontFamily: fonts.monoMedium, fontSize: 14, color: colors.brass,
+    letterSpacing: 1,
+  },
+  lengthSuffix: { color: colors.muted, fontSize: 11 },
+  slider: { marginHorizontal: -4, marginTop: 4 },
+  tickRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: -4 },
+  tick: { fontFamily: fonts.mono, fontSize: 10, color: colors.dim, letterSpacing: 1 },
+
+  // generate button — brass plaque
   generateBtn: {
-    backgroundColor: colors.green, paddingVertical: 18,
-    borderRadius: 50, alignItems: 'center', marginTop: 8,
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    backgroundColor: colors.brass,
+    paddingVertical: 20, paddingHorizontal: spacing.l,
+    borderRadius: radii.sharp,
+    marginTop: spacing.m,
   },
-  generateBtnText: { color: colors.bg, fontSize: 16, fontWeight: '800', letterSpacing: 0.5 },
-  disabled: { opacity: 0.4 },
+  generateBtnText: {
+    fontFamily: fonts.serifBold, fontSize: 18, color: colors.bgDeep,
+    letterSpacing: -0.4,
+  },
+  generateBtnArrow: {
+    fontFamily: fonts.serif, fontSize: 20, color: colors.bgDeep,
+  },
+
+  colophon: { gap: 10, marginTop: spacing.l },
+  colophonText: {
+    fontFamily: fonts.mono, fontSize: 10, color: colors.dim,
+    letterSpacing: 1.4, textAlign: 'center',
+  },
+  colophonItalic: { fontFamily: fonts.serifItalic, fontSize: 11, color: colors.muted, letterSpacing: 0 },
 });

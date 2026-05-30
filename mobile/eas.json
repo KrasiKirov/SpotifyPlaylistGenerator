@@ -7,6 +7,10 @@
     "preview": {
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_BACKEND_URL": "https://spotifyplaylistgenerator-production.up.railway.app",
+        "EXPO_PUBLIC_SPOTIFY_CLIENT_ID": "e37d08dad2274a68889bb1062be02432"
       }
     }
   }

@@ -6,9 +6,10 @@ from dotenv import dotenv_values
 
 config = {**dotenv_values(".env"), **os.environ}
 
+_openai_client = openai.OpenAI(api_key=config["OPENAI_API_KEY"])
+
 
 def get_playlist(prompt: str, count: int = 8) -> list[dict]:
-    client = openai.OpenAI(api_key=config["OPENAI_API_KEY"])
 
     example_json = """[
     {"song": "The Sound of Silence", "artist": "Simon & Garfunkel"},
@@ -36,13 +37,16 @@ def get_playlist(prompt: str, count: int = 8) -> list[dict]:
         },
     ]
 
-    response = client.chat.completions.create(
+    response = _openai_client.chat.completions.create(
         model="gpt-4.1-mini",
         messages=messages,
         max_tokens=max(400, count * 30),
     )
 
-    return json.loads(response.choices[0].message.content)
+    try:
+        return json.loads(response.choices[0].message.content)
+    except json.JSONDecodeError as e:
+        raise ValueError(f"OpenAI returned malformed JSON: {e}") from e
 
 
 def _resolve_track_ids(sp, playlist: list[dict]) -> tuple[list[str], list[str]]:

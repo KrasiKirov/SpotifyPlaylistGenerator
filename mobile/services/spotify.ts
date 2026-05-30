@@ -15,7 +15,6 @@ const KEYS = {
   accessToken: 'spotify_access_token',
   refreshToken: 'spotify_refresh_token',
   expiresAt: 'spotify_expires_at',
-  codeVerifier: 'spotify_code_verifier',
 };
 
 function base64URLEncode(bytes: Uint8Array): string {
@@ -35,8 +34,6 @@ export async function connectSpotify(): Promise<void> {
     { encoding: Crypto.CryptoEncoding.BASE64 }
   );
   const codeChallenge = hash.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-
-  await SecureStore.setItemAsync(KEYS.codeVerifier, codeVerifier);
 
   const authUrl =
     `${AUTH_ENDPOINT}?client_id=${CLIENT_ID}` +
@@ -132,5 +129,4 @@ export async function disconnect(): Promise<void> {
   await SecureStore.deleteItemAsync(KEYS.accessToken);
   await SecureStore.deleteItemAsync(KEYS.refreshToken);
   await SecureStore.deleteItemAsync(KEYS.expiresAt);
-  await SecureStore.deleteItemAsync(KEYS.codeVerifier);
 }

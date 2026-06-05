@@ -8,6 +8,25 @@
 
 **Android** — [Download the latest APK](https://github.com/KrasiKirov/SpotifyPlaylistGenerator/releases/latest), open it on your phone, and open the app. The backend is hosted and ready, no setup required.
 
+## Screenshots
+
+> _Add four captures to [`docs/screenshots/`](docs/screenshots/) with the filenames below and they'll render here. See that folder's README for how to capture them._
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/connect.png" alt="Connect screen" width="200"></td>
+    <td align="center"><img src="docs/screenshots/home.png" alt="Home screen" width="200"></td>
+    <td align="center"><img src="docs/screenshots/preview.png" alt="Preview screen" width="200"></td>
+    <td align="center"><img src="docs/screenshots/result.png" alt="Result screen" width="200"></td>
+  </tr>
+  <tr>
+    <td align="center">Pair with Spotify (PKCE)</td>
+    <td align="center">Describe the evening</td>
+    <td align="center">Curate the tracklist</td>
+    <td align="center">The side is set</td>
+  </tr>
+</table>
+
 ## What it does
 
 You describe an evening; *"late drive home through the rain after a long film"* , choose a length, add optional filters (genre, decade, mood), and the app:

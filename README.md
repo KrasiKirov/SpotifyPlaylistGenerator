@@ -12,10 +12,10 @@
 
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/LandingPage.jpg" alt="Pair with Spotify screen" width="200"></td>
-    <td align="center"><img src="docs/screenshots/GenerationPromptPage.jpg" alt="Compose screen" width="200"></td>
-    <td align="center"><img src="docs/screenshots/PromptResultPage.jpg" alt="Preview tracklist screen" width="200"></td>
-    <td align="center"><img src="docs/screenshots/LastPage.jpg" alt="Result screen" width="200"></td>
+    <td align="center"><img src="docs/screenshots/LandingPage.png" alt="Pair with Spotify screen" width="200"></td>
+    <td align="center"><img src="docs/screenshots/GenerationPromptPage.png" alt="Compose screen" width="200"></td>
+    <td align="center"><img src="docs/screenshots/PromptResultPage.png" alt="Preview tracklist screen" width="200"></td>
+    <td align="center"><img src="docs/screenshots/LastPage.png" alt="Result screen" width="200"></td>
   </tr>
   <tr>
     <td align="center">Pair with Spotify (PKCE)</td>

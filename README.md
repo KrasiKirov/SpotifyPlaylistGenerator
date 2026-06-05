@@ -10,14 +10,12 @@
 
 ## Screenshots
 
-> _Add four captures to [`docs/screenshots/`](docs/screenshots/) with the filenames below and they'll render here. See that folder's README for how to capture them._
-
 <table>
   <tr>
-    <td align="center"><img src="docs/screenshots/connect.png" alt="Connect screen" width="200"></td>
-    <td align="center"><img src="docs/screenshots/home.png" alt="Home screen" width="200"></td>
-    <td align="center"><img src="docs/screenshots/preview.png" alt="Preview screen" width="200"></td>
-    <td align="center"><img src="docs/screenshots/result.png" alt="Result screen" width="200"></td>
+    <td align="center"><img src="docs/screenshots/LandingPage.jpg" alt="Pair with Spotify screen" width="200"></td>
+    <td align="center"><img src="docs/screenshots/GenerationPromptPage.jpg" alt="Compose screen" width="200"></td>
+    <td align="center"><img src="docs/screenshots/PromptResultPage.jpg" alt="Preview tracklist screen" width="200"></td>
+    <td align="center"><img src="docs/screenshots/LastPage.jpg" alt="Result screen" width="200"></td>
   </tr>
   <tr>
     <td align="center">Pair with Spotify (PKCE)</td>

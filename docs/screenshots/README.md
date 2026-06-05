@@ -1,13 +1,13 @@
 # Screenshots
 
-Drop four PNGs here, named exactly so the main [README](../../README.md#screenshots) picks them up:
+Four captures referenced by the main [README](../../README.md#screenshots):
 
-| File           | Screen        | What it shows                              |
-| -------------- | ------------- | ------------------------------------------ |
-| `connect.png`  | Connect       | The "Pair with Spotify" landing screen     |
-| `home.png`     | Home          | The brief / refinements / length form      |
-| `preview.png`  | Preview       | The generated tracklist, editable          |
-| `result.png`   | Result        | "The side is set" success screen           |
+| File                        | Screen   | What it shows                          |
+| --------------------------- | -------- | -------------------------------------- |
+| `LandingPage.jpg`           | Connect  | The "Pair with Spotify" landing screen |
+| `GenerationPromptPage.jpg`  | Home     | The brief / refinements / length form  |
+| `PromptResultPage.jpg`      | Preview  | The generated tracklist, editable      |
+| `LastPage.jpg`              | Result   | "The side is set" success screen       |
 
 ## How to capture
 

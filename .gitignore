@@ -11,3 +11,6 @@ mobile/.env
 
 # Local Claude Code agent workspace (repo root only; mobile/.claude is tracked)
 /.claude/
+
+# Local planning/spec workspace
+docs/superpowers/
